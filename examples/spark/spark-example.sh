@@ -24,7 +24,7 @@ function check_env(){
 
 function build_spark_images(){
     echo "Building distribution for Spark v${spark_ver}"
-    docker build --build-arg spark_version=${spark_ver} -f Dockerfile.build -t spark:v${spark_ver} .
+    docker build --build-arg spark_version=v${spark_ver} -f Dockerfile.build -t spark:v${spark_ver} .
     if [ $? -eq 0 ]; then
        echo "Spark distribution successfully built"
     else 
@@ -42,12 +42,12 @@ function build_spark_images(){
     if [ "$is_minikube" = true ]; then 
     	echo "Building image inside minikube docker env"
         cd ${SPARK_EXAMPLE_DIR}/dist/ &&\
-    	./bin/docker-image-tool.sh -m -r ${DOCKER_REGISTRY_COMPONENTS} -t ${spark_ver} -p kubernetes/dockerfiles/spark/bindings/python/Dockerfile build &&\
+    	./bin/docker-image-tool.sh -m -r ${DOCKER_REGISTRY_COMPONENTS} -t v${spark_ver} -p kubernetes/dockerfiles/spark/bindings/python/Dockerfile build
     else
         echo "Building and pushing images to external registry"
         cd ${SPARK_EXAMPLE_DIR}/dist/ &&\
-    	./bin/docker-image-tool.sh -r ${DOCKER_REGISTRY_COMPONENTS} -t ${spark_ver} -p kubernetes/dockerfiles/spark/bindings/python/Dockerfile build &&\
-    	./bin/docker-image-tool.sh -r ${DOCKER_REGISTRY_COMPONENTS} -t ${spark_ver} -p kubernetes/dockerfiles/spark/bindings/python/Dockerfile push &&\
+    	./bin/docker-image-tool.sh -r ${DOCKER_REGISTRY_COMPONENTS} -t v${spark_ver} -p kubernetes/dockerfiles/spark/bindings/python/Dockerfile build &&\
+    	./bin/docker-image-tool.sh -r ${DOCKER_REGISTRY_COMPONENTS} -t v${spark_ver} -p kubernetes/dockerfiles/spark/bindings/python/Dockerfile push
     fi
 }
 
@@ -80,7 +80,7 @@ function create_book_dataset(){
     fi
     
     echo "Creating the book dataset with DLF"
-    envsubst < bookdataset.yaml | kubectl apply -n ${DATASET_OPERATOR_NAMESPACE} -f <  
+    envsubst < bookdataset.yaml | kubectl apply -n ${DATASET_OPERATOR_NAMESPACE} -f - 
 
     if [ $? -eq 0 ]
     then
@@ -98,12 +98,41 @@ function prepare_k8s(){
 
 function run_spark(){
     echo "Running the example in spark"
+    cd ${SPARK_EXAMPLE_DIR}/dist
     if [ "$is_minikube" = true ]; then
        echo "Running Spark over DLF dataset inside minikube"
-       
+       export K8SMASTER=$(minikube ip)
+       bin/spark-submit \
+       --master k8s://https://${K8SMASTER}:8443 \
+       --deploy-mode cluster \
+       --name spark-dlf \
+       --conf spark.executor.instances=2 \
+       --conf spark.kubernetes.container.image=${DOCKER_REGISTRY_COMPONENTS}/spark-py:${spark_ver} \
+       --conf spark.kubernetes.namespace=${DATASET_OPERATOR_NAMESPACE} \
+       --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark-dlf \
+       --conf spark.kubernetes.driver.podTemplateFile=${SPARK_EXAMPLE_DIR}/booktemplate.yaml \
+       --conf spark.kubernetes.executor.podTemplateFile=${SPARK_EXAMPLE_DIR}/booktemplate.yaml \
+       local:///opt/spark/examples/example_dlf.py
     else
        echo "Running Spark over DLF in the Kubernetes cluster"
+       bin/spark-submit \
+       --master k8s://https://${K8SMASTER}:8443 \
+       --deploy-mode cluster \
+       --name spark-dlf \
+       --conf spark.executor.instances=5 \
+       --conf spark.kubernetes.container.image=${DOCKER_REGISTRY_COMPONENTS}/spark-py:${spark_ver} \
+       --conf spark.kubernetes.container.image.pullSecrets=${DOCKER_REGISTRY_SECRET} \
+       --conf spark.kubernetes.container.image.pullPolicy=Always \
+       --conf spark.kubernetes.namespace=${DATASET_OPERATOR_NAMESPACE} \
+       --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark-dlf \
+       --conf spark.kubernetes.driver.podTemplateFile=${SPARK_EXAMPLE_DIR}/booktemplate.yaml \
+       --conf spark.kubernetes.executor.podTemplateFile=${SPARK_EXAMPLE_DIR}/booktemplate.yaml \
+       local:///opt/spark/examples/example_dlf.py
     fi   
-       
 }
 
+check_env
+build_spark_images
+prepare_k8s
+create_book_dataset
+run_spark
