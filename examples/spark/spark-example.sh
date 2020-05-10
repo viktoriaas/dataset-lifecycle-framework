@@ -6,6 +6,7 @@ DOCKER_REGISTRY_COMPONENTS="${DOCKER_REGISTRY_COMPONENTS:-the_registry_to_use_fo
 DOCKER_REGISTRY_SECRET="your_secret_here"
 spark_ver="3.0.0-rc1" #only support 3.0.0-rc1 at the moment
 is_minikube=true
+minikube_profile="spark-k8s"
 SPARK_EXAMPLE_DIR=`pwd`
 
 function check_env(){
@@ -22,7 +23,7 @@ function check_env(){
     fi
 }
 
-function build_spark_images(){
+function build_spark_distribution(){
     echo "Building distribution for Spark v${spark_ver}"
     docker build --build-arg spark_version=v${spark_ver} -f Dockerfile.build -t spark:v${spark_ver} .
     if [ $? -eq 0 ]; then
@@ -35,7 +36,9 @@ function build_spark_images(){
     spark_cont=$(docker create spark:v${spark_ver})
     docker cp ${spark_cont}:/opt/spark/dist ${SPARK_EXAMPLE_DIR}
     docker rm ${spark_cont}
-    
+}
+
+function build_spark_images(){
     echo "Copying the example script to the distribution"
     cp example_*.py ${SPARK_EXAMPLE_DIR}/dist/examples/
     echo "Building Docker images for Spark"
@@ -56,10 +59,10 @@ function create_book_dataset(){
     cd ${SPARK_EXAMPLE_DIR}
     docker run --rm --network host \
            -e AWS_ACCESS_KEY_ID \
-               -e AWS_SECRET_ACCESS_KEY \
-               awscli-alpine \
-               aws --endpoint ${S3_ENDPOINT} \
-               s3 mb s3://book-test
+           -e AWS_SECRET_ACCESS_KEY \
+           awscli-alpine \
+           aws --endpoint ${S3_ENDPOINT} \
+           s3 mb s3://book-test
 
     if [ $? -eq 0 ]
     then
@@ -68,11 +71,11 @@ function create_book_dataset(){
 
     docker run --rm --network host \
            -e AWS_ACCESS_KEY_ID \
-               -e AWS_SECRET_ACCESS_KEY \
-               -v  ${PWD}:/sampleapp \
-               awscli-alpine \
-               aws --endpoint ${S3_ENDPOINT} \
-               s3 cp ./books.csv s3://book-test/
+           -e AWS_SECRET_ACCESS_KEY \
+           -v  ${PWD}:/data \
+           awscli-alpine \
+           aws --endpoint ${S3_ENDPOINT} \
+           s3 cp /data/books.csv s3://book-test/
 
     if [ $? -eq 0 ]
     then
@@ -91,9 +94,9 @@ function create_book_dataset(){
 function prepare_k8s(){
     echo "Creating service account and rolebindings in Kubernetes"
     kubectl create serviceaccount -n ${DATASET_OPERATOR_NAMESPACE} spark-dlf
-    kubectl create rolebinding spark-role --=edit --serviceaccount=${DATASET_OPERATOR_NAMESPACE}:spark-dlf --namespace=${DATASET_OPERATOR_NAMESPACE}
+    kubectl create rolebinding spark-role --role=edit --serviceaccount=${DATASET_OPERATOR_NAMESPACE}:spark-dlf --namespace=${DATASET_OPERATOR_NAMESPACE}
     kubectl create role spark-modify-pods --verb=get,list,watch,update,delete,create,patch --resource=pods,deployments,secrets
-    kubectl create rolebinding spark-dlf-xtra --clusterrole=spark-modify-pods --serviceaccount=${DATASET_OPERATOR_NAMESPACE}:spark-dlf --namespace=${DATASET_OPERATOR_NAMESPACE}
+    kubectl create rolebinding spark-dlf-xtra --role=spark-modify-pods --serviceaccount=${DATASET_OPERATOR_NAMESPACE}:spark-dlf --namespace=${DATASET_OPERATOR_NAMESPACE}
 }
 
 function run_spark(){
@@ -132,7 +135,8 @@ function run_spark(){
 }
 
 check_env
-build_spark_images
-prepare_k8s
-create_book_dataset
+#build_spark_distribution
+#build_spark_images
+#prepare_k8s
+#create_book_dataset
 run_spark
