@@ -2,7 +2,7 @@ ARG jdk_distribution=adoptopenjdk
 ARG jdk_version=8-jdk-openj9
 FROM ${jdk_distribution}:${jdk_version}
 
-ARG spark_version
+ARG spark_version=v3.0.0-rc1
 #RUN mkdir -p /opt/python && mkdir -p /opt/spark
 RUN mkdir -p /opt/spark
 
@@ -12,6 +12,8 @@ WORKDIR /opt
 
 RUN apt-get update &&\
     apt-get install -y curl tar python3 python3-pip &&\
-    curl -ksSL https://github.com/apache/spark/archive/${spark_version}.tar.gz | tar -xz -C /opt/spark --strip-components 1 &&\
-    /opt/spark/dev/make-distribution.sh --name spark-3.0 --pip -Phadoop-cloud -Phive -Pkubernetes &&\
-    cd dist/jars && url -O -fsSL https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk/1.7.4/aws-java-sdk-1.7.4.jar
+    curl -fsSL https://github.com/apache/spark/archive/${spark_version}.tar.gz | tar -xz -C /opt/spark --strip-components 1 &&\
+    sed -i -e "s/4.6.4/4.7.1/g" /opt/spark/resource-managers/kubernetes/core/pom.xml &&\
+    sed -i -e "s/4.6.4/4.7.1/g" /opt/spark/resource-managers/kubernetes/integration-tests/pom.xml &&\
+    /opt/spark/dev/make-distribution.sh --name spark-${spark-version} --pip -Phadoop-cloud -Phive -Pkubernetes &&\
+    cd /opt/spark/dist/jars && curl -O -fsSL https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk/1.7.4/aws-java-sdk-1.7.4.jar

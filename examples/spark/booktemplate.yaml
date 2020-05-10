@@ -1,0 +1,18 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dlf-spark
+spec:
+  template:
+    metadata:
+      name: dlf-spark
+      labels:
+        dataset.0.id: "bookds"
+        dataset.0.useas: "mount"
+    spec:
+      containers:
+        resources:
+          requests:      
+            cpu: 15m
+            memory: 20Mi
