@@ -3,9 +3,9 @@
 #Variables section
 DATASET_OPERATOR_NAMESPACE="${DATASET_OPERATOR_NAMESPACE:-default}"
 DOCKER_REGISTRY_COMPONENTS="${DOCKER_REGISTRY_COMPONENTS:-the_registry_to_use_for_components}"
-DOCKER_REGISTRY_SECRET="your_secret_here"
+DOCKER_REGISTRY_SECRET="art-drl-hpc"
 spark_ver="3.0.0-rc1" #only support 3.0.0-rc1 at the moment
-is_minikube=true
+is_minikube=false
 minikube_profile="spark-k8s"
 SPARK_EXAMPLE_DIR=`pwd`
 
@@ -56,7 +56,7 @@ function build_spark_images(){
 
 function create_book_dataset(){
     echo "Creating S3 bucket and uploading data"
-    bucket_suffix=$(shuf -n1 /usr/share/dict/words)
+    bucket_suffix=$(shuf -n5 /usr/share/dict/words | grep -E '^[a-z]{4,10}$' | head -n1)
     export bucket_name=book-test-${bucket_suffix}
     echo "Creating bucket ${bucket_name}"
     cd ${SPARK_EXAMPLE_DIR}
@@ -125,7 +125,7 @@ function run_spark(){
        --master k8s://https://${K8SMASTER}:8443 \
        --deploy-mode cluster \
        --name spark-dlf \
-       --conf spark.executor.instances=5 \
+       --conf spark.executor.instances=1 \
        --conf spark.kubernetes.container.image=${DOCKER_REGISTRY_COMPONENTS}/spark-py:v${spark_ver} \
        --conf spark.kubernetes.container.image.pullSecrets=${DOCKER_REGISTRY_SECRET} \
        --conf spark.kubernetes.container.image.pullPolicy=Always \
@@ -139,7 +139,7 @@ function run_spark(){
 
 check_env
 #build_spark_distribution
-build_spark_images
+#build_spark_images
 prepare_k8s
 create_book_dataset
 run_spark
