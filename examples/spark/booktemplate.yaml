@@ -6,13 +6,7 @@ metadata:
 spec:
   template:
     metadata:
-      name: dlf-spark
+      name: spark-bookds
       labels:
         dataset.0.id: "bookds"
         dataset.0.useas: "mount"
-    spec:
-      containers:
-        resources:
-          requests:      
-            cpu: 15m
-            memory: 20Mi
