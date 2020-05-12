@@ -45,7 +45,7 @@ function build_spark_images(){
     if [ "$is_minikube" = true ]; then 
     	echo "Building image inside minikube docker env"
         cd ${SPARK_EXAMPLE_DIR}/dist/ &&\
-    	./bin/docker-image-tool.sh -m -r ${DOCKER_REGISTRY_COMPONENTS} -t v${spark_ver} -p kubernetes/dockerfiles/spark/bindings/python/Dockerfile build
+    	./bin/docker-image-tool.sh -m -t v${spark_ver} -p kubernetes/dockerfiles/spark/bindings/python/Dockerfile build
     else
         echo "Building and pushing images to external registry"
         cd ${SPARK_EXAMPLE_DIR}/dist/ &&\
@@ -56,13 +56,16 @@ function build_spark_images(){
 
 function create_book_dataset(){
     echo "Creating S3 bucket and uploading data"
+    bucket_suffix=$(shuf -n1 /usr/share/dict/words)
+    export bucket_name=book-test-${bucket_suffix}
+    echo "Creating bucket ${bucket_name}"
     cd ${SPARK_EXAMPLE_DIR}
     docker run --rm --network host \
            -e AWS_ACCESS_KEY_ID \
            -e AWS_SECRET_ACCESS_KEY \
            awscli-alpine \
            aws --endpoint ${S3_ENDPOINT} \
-           s3 mb s3://book-test
+           s3 mb s3://${bucket_name}
 
     if [ $? -eq 0 ]
     then
@@ -75,7 +78,7 @@ function create_book_dataset(){
            -v  ${PWD}:/data \
            awscli-alpine \
            aws --endpoint ${S3_ENDPOINT} \
-           s3 cp /data/books.csv s3://book-test/
+           s3 cp /data/books.csv s3://${bucket_name}/
 
     if [ $? -eq 0 ]
     then
@@ -84,6 +87,7 @@ function create_book_dataset(){
     
     echo "Creating the book dataset with DLF"
     envsubst < bookdataset.yaml | kubectl apply -n ${DATASET_OPERATOR_NAMESPACE} -f - 
+    sleep 20
 
     if [ $? -eq 0 ]
     then
@@ -108,9 +112,8 @@ function run_spark(){
        bin/spark-submit \
        --master k8s://https://${K8SMASTER}:8443 \
        --deploy-mode cluster \
-       --name spark-dlf \
-       --conf spark.executor.instances=2 \
-       --conf spark.kubernetes.container.image=${DOCKER_REGISTRY_COMPONENTS}/spark-py:${spark_ver} \
+       --conf spark.executor.instances=1 \
+       --conf spark.kubernetes.container.image=spark-py:v${spark_ver} \
        --conf spark.kubernetes.namespace=${DATASET_OPERATOR_NAMESPACE} \
        --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark-dlf \
        --conf spark.kubernetes.driver.podTemplateFile=${SPARK_EXAMPLE_DIR}/booktemplate.yaml \
@@ -123,7 +126,7 @@ function run_spark(){
        --deploy-mode cluster \
        --name spark-dlf \
        --conf spark.executor.instances=5 \
-       --conf spark.kubernetes.container.image=${DOCKER_REGISTRY_COMPONENTS}/spark-py:${spark_ver} \
+       --conf spark.kubernetes.container.image=${DOCKER_REGISTRY_COMPONENTS}/spark-py:v${spark_ver} \
        --conf spark.kubernetes.container.image.pullSecrets=${DOCKER_REGISTRY_SECRET} \
        --conf spark.kubernetes.container.image.pullPolicy=Always \
        --conf spark.kubernetes.namespace=${DATASET_OPERATOR_NAMESPACE} \
@@ -136,7 +139,7 @@ function run_spark(){
 
 check_env
 #build_spark_distribution
-#build_spark_images
-#prepare_k8s
-#create_book_dataset
+build_spark_images
+prepare_k8s
+create_book_dataset
 run_spark

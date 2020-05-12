@@ -8,4 +8,4 @@ spec:
     accessKeyID: "${AWS_ACCESS_KEY_ID}"
     secretAccessKey: "${AWS_SECRET_ACCESS_KEY}"
     endpoint: "${S3_ENDPOINT}"
-    bucket: "book-test"
+    bucket: "${bucket_name}"
