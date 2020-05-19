@@ -5,7 +5,7 @@ DATASET_OPERATOR_NAMESPACE="${DATASET_OPERATOR_NAMESPACE:-default}"
 DOCKER_REGISTRY_COMPONENTS="${DOCKER_REGISTRY_COMPONENTS:-the_registry_to_use_for_components}"
 DOCKER_REGISTRY_SECRET="art-drl-hpc"
 spark_ver="3.0.0-rc1" #only support 3.0.0-rc1 at the moment
-is_minikube=false
+is_minikube=true
 minikube_profile="spark-k8s"
 SPARK_EXAMPLE_DIR=`pwd`
 
@@ -57,33 +57,34 @@ function build_spark_images(){
 function create_book_dataset(){
     echo "Creating S3 bucket and uploading data"
     bucket_suffix=$(shuf -n5 /usr/share/dict/words | grep -E '^[a-z]{4,10}$' | head -n1)
-    export bucket_name=book-test-${bucket_suffix}
-    echo "Creating bucket ${bucket_name}"
-    cd ${SPARK_EXAMPLE_DIR}
-    docker run --rm --network host \
-           -e AWS_ACCESS_KEY_ID \
-           -e AWS_SECRET_ACCESS_KEY \
-           awscli-alpine \
-           aws --endpoint ${S3_ENDPOINT} \
-           s3 mb s3://${bucket_name}
+    #export bucket_name=book-test-${bucket_suffix}
+    export bucket_name=book-test
+   # echo "Creating bucket ${bucket_name}"
+   # cd ${SPARK_EXAMPLE_DIR}
+   # docker run --rm --network host \
+   #        -e AWS_ACCESS_KEY_ID \
+   #        -e AWS_SECRET_ACCESS_KEY \
+   #        awscli-alpine \
+   #        aws --endpoint ${S3_ENDPOINT} \
+   #        s3 mb s3://${bucket_name}
 
-    if [ $? -eq 0 ]
-    then
-        echo "Bucket book-test successfully created"
-    fi
+   # if [ $? -eq 0 ]
+   # then
+   #     echo "Bucket book-test successfully created"
+   # fi
 
-    docker run --rm --network host \
-           -e AWS_ACCESS_KEY_ID \
-           -e AWS_SECRET_ACCESS_KEY \
-           -v  ${PWD}:/data \
-           awscli-alpine \
-           aws --endpoint ${S3_ENDPOINT} \
-           s3 cp /data/books.csv s3://${bucket_name}/
+   # docker run --rm --network host \
+   #        -e AWS_ACCESS_KEY_ID \
+   #        -e AWS_SECRET_ACCESS_KEY \
+   #        -v  ${PWD}:/data \
+   #        awscli-alpine \
+   #        aws --endpoint ${S3_ENDPOINT} \
+   #        s3 cp /data/books.csv s3://${bucket_name}/
 
-    if [ $? -eq 0 ]
-    then
-        echo "books.csv successfully uploaded"
-    fi
+   # if [ $? -eq 0 ]
+   # then
+   #     echo "books.csv successfully uploaded"
+   # fi
     
     echo "Creating the book dataset with DLF"
     envsubst < bookdataset.yaml | kubectl apply -n ${DATASET_OPERATOR_NAMESPACE} -f - 
@@ -116,8 +117,8 @@ function run_spark(){
        --conf spark.kubernetes.container.image=spark-py:v${spark_ver} \
        --conf spark.kubernetes.namespace=${DATASET_OPERATOR_NAMESPACE} \
        --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark-dlf \
-       --conf spark.kubernetes.driver.podTemplateFile=${SPARK_EXAMPLE_DIR}/booktemplate.yaml \
-       --conf spark.kubernetes.executor.podTemplateFile=${SPARK_EXAMPLE_DIR}/booktemplate.yaml \
+       --conf spark.kubernetes.driver.podTemplateFile=${SPARK_EXAMPLE_DIR}/podtemplate.yaml \
+       --conf spark.kubernetes.executor.podTemplateFile=${SPARK_EXAMPLE_DIR}/podtemplate.yaml \
        local:///opt/spark/examples/example_dlf.py
     else
        echo "Running Spark over DLF in the Kubernetes cluster"
@@ -139,7 +140,7 @@ function run_spark(){
 
 check_env
 #build_spark_distribution
-#build_spark_images
+build_spark_images
 prepare_k8s
 create_book_dataset
 run_spark
