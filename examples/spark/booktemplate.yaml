@@ -6,7 +6,9 @@ metadata:
 spec:
   template:
     metadata:
-      name: spark-bookds
       labels:
         dataset.0.id: "bookds"
         dataset.0.useas: "mount"
+    spec:
+      containers:
+      - name: dlf-spark        
