@@ -57,9 +57,11 @@ spec:
         - --conf
         - spark.kubernetes.driver.pod.name=spark-dlf-driver
         - --conf
-        - spark.driver.host=spark-dlf-svc.default.svc.cluster.local
+        - spark.driver.host=spark-dlf-svc.${DATASET_OPERATOR_NAMESPACE}.svc.cluster.local
         - --conf
         - spark.driver.port=20020
+        - --conf
+        - spark.kubernetes.container.image.pullSecrets=${DOCKER_REGISTRY_SECRET}
         - --conf
         - spark.jars.ivy=/tmp/.ivy
         - local:///opt/spark/examples/example_dlf.py

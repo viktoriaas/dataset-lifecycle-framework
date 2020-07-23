@@ -5,7 +5,7 @@ DATASET_OPERATOR_NAMESPACE="${DATASET_OPERATOR_NAMESPACE:-default}"
 DOCKER_REGISTRY_COMPONENTS="${DOCKER_REGISTRY_COMPONENTS:-the_registry_to_use_for_components}"
 export DOCKER_REGISTRY_SECRET="art-drl-hpc"
 spark_ver="3.0.0-rc2" #only support 3.0.0-rc1 at the moment
-is_minikube=true
+is_minikube=false
 minikube_profile="spark-k8s"
 SPARK_EXAMPLE_DIR=`pwd`
 
@@ -112,12 +112,12 @@ function run_spark(){
     cd ${SPARK_EXAMPLE_DIR}
     #export K8SMASTER=$(kubectl cluster-info | grep -Eoi '(http|https)://[^/"]+$')
     export DOCKER_REGISTRY_COMPONENTS DATASET_OPERATOR_NAMESPACE spark_version=${spark_ver}
-    envsubst < spark-client-mount-example.yaml | kubectl apply -n ${DATASET_OPERATOR_NAMESPACE} -f -
+    envsubst < spark-client-example.yaml | kubectl apply -n ${DATASET_OPERATOR_NAMESPACE} -f -
 }
 
-check_env
-build_spark_distribution
-build_spark_images
+#check_env
+#build_spark_distribution
+#build_spark_images
 prepare_k8s
 create_book_dataset
 run_spark
