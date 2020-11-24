@@ -1,23 +1,26 @@
 package dataset
 
 import (
+	utils "github.com/IBM/dataset-lifecycle-framework/plugins/noobaa-cache-plugin/pkg"
 	"context"
 	comv1alpha1 "github.com/IBM/dataset-lifecycle-framework/src/dataset-operator/pkg/apis/com/v1alpha1"
-	"gopkg.in/yaml.v2"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"os"
+	"io/ioutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	//corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	//"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	//"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var log = logf.Log.WithName("controller_dataset")
@@ -54,13 +57,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Pods and requeue the owner Dataset
-	err = c.Watch(&source.Kind{Type: &comv1alpha1.DatasetInternal{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &comv1alpha1.Dataset{},
-	})
-	if err != nil {
-		return err
-	}
+	//err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
+	//	IsController: true,
+	//	OwnerType:    &comv1alpha1.Dataset{},
+	//})
+	//if err != nil {
+	//	return err
+	//}
 
 	return nil
 }
@@ -87,86 +90,83 @@ func (r *ReconcileDataset) Reconcile(request reconcile.Request) (reconcile.Resul
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling Dataset")
 
-	datasetInstance := &comv1alpha1.Dataset{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, datasetInstance)
+	// Fetch the Dataset instance
+	instance := &comv1alpha1.Dataset{}
+	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			reqLogger.Info("Dataset is deleted","name",request.NamespacedName)
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
+	params_add_external:= `{
+        "name": "`+instance.ObjectMeta.Name+`",
+		"endpoint_type": "S3_COMPATIBLE",
+		"endpoint": "`+instance.Spec.Local["endpoint"]+`",
+		"identity": "`+instance.Spec.Local["accessKeyID"]+`",
+		"secret": "`+instance.Spec.Local["secretAccessKey"]+`"
+		}`
+	utils.MakeNoobaaRequest("account_api","add_external_connection",params_add_external)
 
-	pluginPods, err := getCachingPlugins(r.client,os.Getenv("OPERATOR_NAMESPACE"))
-	if(err!=nil){return reconcile.Result{},err}
+	params_create_pool:= `{
+    "name": "`+instance.ObjectMeta.Name+`",
+    "connection": "`+instance.ObjectMeta.Name+`",
+    "target_bucket": "`+instance.Spec.Local["bucket"]+`"
+    }`
+	utils.MakeNoobaaRequest("pool_api","create_namespace_resource",params_create_pool)
 
-	if(len(pluginPods.Items)==0){
-		pluginPods, err = getCachingPlugins(r.client,"noobaa")
-		if(err!=nil){return reconcile.Result{},err}
-	}
+	params_create_bucket:= `{
+		"name": "`+instance.Spec.Local["bucket"]+`-cached",
+		"namespace":{
+		"write_resource": "`+instance.ObjectMeta.Name+`",
+		"read_resources": ["`+instance.ObjectMeta.Name+`"],
+		"caching": { "ttl_ms": 60000 }
+		}
+    }`
+	utils.MakeNoobaaRequest("bucket_api","create_bucket",params_create_bucket)
 
-	// This means that we should create a 1-1 DatasetInteral
-	if(len(pluginPods.Items)!=0){
-		//TODO pick the first plugin for the time being
-		//datasetInstance.Annotations = pluginPods.Items[0].Labels
-		//err = r.client.Update(context.TODO(),datasetInstance)
-		//if(err!=nil){
-		//	reqLogger.Error(err,"Error while updating dataset according to caching plugin")
-		//	return reconcile.Result{},err
-		//}
-		//In this case we are done, the caching plugin takes control of the dataset
-		return reconcile.Result{}, nil
-	}
-
-	datasetInternalInstance := &comv1alpha1.DatasetInternal{}
-	err = r.client.Get(context.TODO(), request.NamespacedName, datasetInternalInstance)
-	if(err!=nil && !errors.IsNotFound(err)){
-		//Unknown error occured, shouldn't happen
-		return reconcile.Result{}, err
-	} else if(err!=nil && errors.IsNotFound(err)){
-			//1-1 Dataset and DatasetInternal because there is no caching plugin
-			reqLogger.Info("1-1 Dataset and DatasetInternal because there is no caching plugin")
-			newDatasetInternalInstance := &comv1alpha1.DatasetInternal{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:                       datasetInstance.ObjectMeta.Name,
-					Namespace:                  datasetInstance.ObjectMeta.Namespace,
-				},
-				Spec:       datasetInstance.Spec,
-			}
-			if err := controllerutil.SetControllerReference(datasetInstance, newDatasetInternalInstance, r.scheme); err != nil {
-				return reconcile.Result{}, err
-			}
-			err = r.client.Create(context.TODO(),newDatasetInternalInstance)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-	}
-
-	return reconcile.Result{}, nil
-}
-
-func getCachingPlugins(c client.Client, namespace string) (*v1.PodList,error){
-	podList := &v1.PodList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(namespace),
-		client.MatchingLabels(map[string]string{
-			"dlf-plugin-type":"caching",
-		}),
-		client.HasLabels{"dlf-plugin-name"},
-	}
-	err := c.List(context.TODO(),podList,listOpts...)
-	return podList,err
-}
-
-func formatToYaml(in interface{}) (string,error) {
-	d, err := yaml.Marshal(&in)
+	AccessKey, err := ioutil.ReadFile("/etc/noobaa/s3/AWS_ACCESS_KEY_ID")
 	if err != nil {
-		log.Error(err,"Error in marshaling")
-		return "", err
+		return reconcile.Result{}, err
 	}
-	return string(d),nil
+
+	SecretKey, err := ioutil.ReadFile("/etc/noobaa/s3/AWS_SECRET_ACCESS_KEY")
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	internalDataset := &comv1alpha1.DatasetInternal{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:  instance.ObjectMeta.Name,
+			Namespace: instance.ObjectMeta.Namespace,
+			Labels: map[string]string{
+				"dlf-plugin-type": "caching",
+				"dlf-plugin-name": "ceph-cache-plugin",
+			},
+		},
+		Spec: comv1alpha1.DatasetSpec{
+			Local: map[string]string{
+				"type": "COS",
+				"accessKeyID":    string(AccessKey),
+				"secretAccessKey": string(SecretKey),
+				"endpoint":        "http://s3.noobaa.svc",
+				"bucket":          instance.Spec.Local["bucket"]+"-cached",
+			},
+		},
+	}
+	if err := controllerutil.SetControllerReference(instance, internalDataset, r.scheme); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	err = r.client.Create(context.TODO(), internalDataset)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	// Pod already exists - don't requeue
+	reqLogger.Info("Skip reconcile: Pod already exists")
+	return reconcile.Result{}, nil
 }
