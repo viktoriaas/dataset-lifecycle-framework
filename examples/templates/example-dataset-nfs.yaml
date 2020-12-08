@@ -6,4 +6,4 @@ spec:
   local:
     type: "NFS"
     server: 10.110.71.124
-    share: /test
+    share: /

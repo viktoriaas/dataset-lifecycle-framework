@@ -782,7 +782,7 @@ spec:
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: "quay.io/ibm-dlf/csi-nfs:latest-amd64"
+          image: "quay.io/ibm-dlf/csi-nfs:nfs-create-dir-amd64"
           args :
             - "--nodeid=$(NODE_ID)"
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -1020,7 +1020,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: nfs
-          image: "quay.io/ibm-dlf/csi-nfs:latest-amd64"
+          image: "quay.io/ibm-dlf/csi-nfs:nfs-create-dir-amd64"
           args :
             - "--nodeid=$(NODE_ID)"
             - "--endpoint=$(CSI_ENDPOINT)"

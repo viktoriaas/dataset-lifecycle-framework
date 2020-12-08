@@ -40,6 +40,7 @@ type nodeServer struct {
 
 func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	targetPath := req.GetTargetPath()
+	glog.Info("NodePublishVolume invoked")
 	notMnt, err := ns.mounter.IsLikelyNotMountPoint(targetPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -69,7 +70,6 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer os.RemoveAll(dir)
 	glog.Info("Creating temp directory "+dir)
 	err = ns.mounter.Mount(source, dir, "nfs", mo)
 	if err != nil {
