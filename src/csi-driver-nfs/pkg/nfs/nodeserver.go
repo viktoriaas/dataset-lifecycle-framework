@@ -66,7 +66,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	s := req.GetVolumeContext()["server"]
 	ep := req.GetVolumeContext()["share"]
 	createDirPVC := false
-	createDirPVC, _ = strconv.ParseBool(req.GetVolumeContext()["readonly"])
+	createDirPVC, _ = strconv.ParseBool(req.GetVolumeContext()["createDirPVC"])
 
 	source := fmt.Sprintf("%s:%s", s, ep)
 
