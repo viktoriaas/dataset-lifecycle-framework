@@ -5,5 +5,5 @@ metadata:
 spec:
   local:
     type: "NFS"
-    server: {IP_ADDRESS}
-    share: {/nfs/share/path}
+    server: 10.110.71.124
+    share: /test

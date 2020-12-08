@@ -18,7 +18,10 @@ package nfs
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/golang/glog"
@@ -62,7 +65,47 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	ep := req.GetVolumeContext()["share"]
 	source := fmt.Sprintf("%s:%s", s, ep)
 
-	err = ns.mounter.Mount(source, targetPath, "nfs", mo)
+	dir, err := ioutil.TempDir("dir", "prefix")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	glog.Info("Creating temp directory "+dir)
+	err = ns.mounter.Mount(source, dir, "nfs", mo)
+	if err != nil {
+		if os.IsPermission(err) {
+			return nil, status.Error(codes.PermissionDenied, err.Error())
+		}
+		if strings.Contains(err.Error(), "invalid argument") {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	path := filepath.Join(dir, "someSubPath")
+	err = os.MkdirAll(path, os.ModePerm)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	notMnt, err = ns.mounter.IsLikelyNotMountPoint(path)
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, status.Error(codes.NotFound, "Targetpath not found")
+		} else {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+	if notMnt {
+		return nil, status.Error(codes.NotFound, "Volume not mounted")
+	}
+
+	err = mount.CleanupMountPoint(path, ns.mounter, false)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	finalSource := filepath.Join(source, "someSubPath")
+
+	err = ns.mounter.Mount(finalSource, targetPath, "nfs", mo)
 	if err != nil {
 		if os.IsPermission(err) {
 			return nil, status.Error(codes.PermissionDenied, err.Error())
