@@ -272,6 +272,10 @@ func processLocalDatasetNFS(cr *comv1alpha1.DatasetInternal, rc *ReconcileDatase
 
 	server := cr.Spec.Local["server"]
 	share := cr.Spec.Local["share"]
+	createDirPVC := "false"
+	if createDirPVCValueString, ok := cr.Spec.Local["createDirPVC"]; ok {
+		createDirPVC = createDirPVCValueString
+	}
 
 	labels := map[string]string{
 		"dataset": cr.Name,
@@ -283,6 +287,7 @@ func processLocalDatasetNFS(cr *comv1alpha1.DatasetInternal, rc *ReconcileDatase
 	csiVolumeAttributes := map[string]string{
 		"server": server,
 		"share":  share,
+		"createDirPVC": createDirPVC,
 	}
 	pvSource := &corev1.CSIPersistentVolumeSource{
 		Driver:           csiDriverName,
