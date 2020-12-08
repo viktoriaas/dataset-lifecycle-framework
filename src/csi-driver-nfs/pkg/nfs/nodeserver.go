@@ -86,7 +86,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	notMnt, err = ns.mounter.IsLikelyNotMountPoint(path)
+	notMnt, err = ns.mounter.IsLikelyNotMountPoint(dir)
 
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -99,7 +99,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Error(codes.NotFound, "Volume not mounted")
 	}
 
-	err = mount.CleanupMountPoint(path, ns.mounter, false)
+	err = mount.CleanupMountPoint(dir, ns.mounter, false)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
