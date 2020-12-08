@@ -17,7 +17,7 @@ limitations under the License.
 package main
 
 import (
-	"/csi-driver-nfs/pkg/nfs"
+	"csi-driver-nfs/pkg/nfs"
 	"flag"
 	"fmt"
 	"os"

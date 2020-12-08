@@ -1,4 +1,4 @@
-module /csi-driver-nfs
+module csi-driver-nfs
 
 go 1.12
 
