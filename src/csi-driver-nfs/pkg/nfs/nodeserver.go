@@ -66,7 +66,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	ep := req.GetVolumeContext()["share"]
 	source := fmt.Sprintf("%s:%s", s, ep)
 
-	dir, err := ioutil.TempDir("dir", "prefix")
+	dir, err := ioutil.TempDir("", "")
 	if err != nil {
 		log.Fatal(err)
 	}
