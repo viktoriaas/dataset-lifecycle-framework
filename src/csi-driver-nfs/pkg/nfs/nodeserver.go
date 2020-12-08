@@ -72,9 +72,6 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	if(createDirPVC == true) {
 
-		//uuidForPVC, _ := uuid.NewUUID()
-		//uuidForPVCString := uuidForPVC.String()
-
 		dir, err := ioutil.TempDir("", "")
 		if err != nil {
 			log.Fatal(err)

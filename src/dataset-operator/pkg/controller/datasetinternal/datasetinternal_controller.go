@@ -2,6 +2,7 @@ package datasetinternal
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"strconv"
 
 	comv1alpha1 "github.com/IBM/dataset-lifecycle-framework/src/dataset-operator/pkg/apis/com/v1alpha1"
@@ -281,9 +282,12 @@ func processLocalDatasetNFS(cr *comv1alpha1.DatasetInternal, rc *ReconcileDatase
 		"dataset": cr.Name,
 	}
 
+	uuidForPVC, _ := uuid.NewUUID()
+	uuidForPVCString := uuidForPVC.String()
+
 	storageClassName := "csi-nfs"
 	csiDriverName := "csi-nfsplugin"
-	csiVolumeHandle := "data-id"
+	csiVolumeHandle := cr.ObjectMeta.Name+"-"+uuidForPVCString[:6]
 	csiVolumeAttributes := map[string]string{
 		"server": server,
 		"share":  share,
