@@ -3,7 +3,8 @@ kind: Deployment
 metadata:
   # This name uniquely identifies the Deployment
   name: minio
-  namespace: dlf
+  labels:
+    app: minio
 spec:
   selector:
     matchLabels:
@@ -22,6 +23,19 @@ spec:
       volumes:
         - name: data
           emptyDir: {}
+        - name: dummy-data
+          configMap:
+            name: dummy-data
+      initContainers:
+        - name: populate-data
+          image: alpine
+          volumeMounts:
+            - mountPath: /from
+              name: dummy-data
+            - mountPath: /to
+              name: data
+          command: [ "/bin/sh" ]
+          args: [ "-c", "mkdir /to/bucket; cp /from/* /to/bucket" ]
       containers:
         - name: minio
           # Volume mounts for this container
