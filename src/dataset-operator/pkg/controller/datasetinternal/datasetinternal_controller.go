@@ -271,6 +271,13 @@ func processLocalDatasetNFS(cr *comv1alpha1.DatasetInternal, rc *ReconcileDatase
 	processLocalDatasetLogger := log.WithValues("Dataset.Namespace", cr.Namespace, "Dataset.Name", cr.Name, "Method", "processLocalDatasetNFS")
 	processLocalDatasetLogger.Info("Dataset type NFS")
 
+	foundPVC := &corev1.PersistentVolumeClaim{}
+	err := rc.client.Get(context.TODO(), types.NamespacedName{Name: cr.ObjectMeta.Name, Namespace: cr.ObjectMeta.Namespace}, foundPVC)
+	if(err == nil){
+		processLocalDatasetLogger.Info("NFS Dataset has been provisioned, skipping...")
+		return reconcile.Result{}, nil
+	}
+
 	server := cr.Spec.Local["server"]
 	share := cr.Spec.Local["share"]
 	createDirPVC := "false"
