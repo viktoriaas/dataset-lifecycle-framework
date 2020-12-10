@@ -363,7 +363,7 @@ func processLocalDatasetNFS(cr *comv1alpha1.DatasetInternal, rc *ReconcileDatase
 		return reconcile.Result{}, err
 	}
 
-	foundPVC := &corev1.PersistentVolumeClaim{}
+	foundPVC = &corev1.PersistentVolumeClaim{}
 	err = rc.client.Get(context.TODO(), types.NamespacedName{Name: newPVC.Name, Namespace: newPVC.Namespace}, foundPVC)
 	if err != nil && errors.IsNotFound(err) {
 		processLocalDatasetLogger.Info("Creating new pvc", "PVC.Namespace", newPVC.Namespace, "PVC.Name", newPVC.Name)
