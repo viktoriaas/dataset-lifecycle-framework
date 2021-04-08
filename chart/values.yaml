@@ -45,3 +45,5 @@ dataset-operator-chart:
   datasetoperator:
     image: "dataset-operator"
     tag: "label-edit"
+
+unrestricted: false
